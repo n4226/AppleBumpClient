@@ -9,6 +9,16 @@ import Foundation
 
 extension Client {
     
+    public func connectForReverseLookup(id: UUID)async throws ->UUID? {
+        if let vid = userDatabase.reverseLookup(id: id) {
+            return vid
+        }
+        if let p = nearbyPeripherals[id] {
+            try await connectAndWaitForComplete(to: p)
+        }
+        return userDatabase.reverseLookup(id: id)
+    }
+    
     func connect(toPeripheral: BKRemotePeripheral) async throws {
         let _:Void = try await withCheckedThrowingContinuation { cont in
             central.connect(remotePeripheral: toPeripheral) { remotePeripheral, error in
@@ -17,7 +27,6 @@ extension Client {
                     cont.resume(with: .failure(Errors.unknown))
                 } else {
                     remotePeripheral.delegate = self
-                    self.connectedPeripherals[remotePeripheral.identifier] = remotePeripheral
                     self.pendingConnections.insert(remotePeripheral.identifier)
                     cont.resume(with: .success(()))
                 }
@@ -71,7 +80,8 @@ extension Client: BKPeripheralDelegate {
 
         print("got remote connection request")
         remoteCentral.delegate = self
-        connectedCentrals[remoteCentral.identifier] = remoteCentral
+        
+        pendingConnections.insert(remoteCentral.identifier)
         
         do {
             // send back conneciton ident
@@ -98,7 +108,8 @@ extension Client: BKPeripheralDelegate {
 extension Client: BKCentralDelegate {
     public func central(_ central: BKCentral, remotePeripheralDidDisconnect remotePeripheral: BKRemotePeripheral) {
         remotePeripheral.delegate = nil
-//        connectedPeripherals.removeValue(forKey: remotePeripheral.identifier)
+        connectedPeripherals.removeValue(forKey: remotePeripheral.identifier)
+        
 //        deviceDisconected.send((allSeenDevices[remotePeripheral.identifier])?.device ?? Device(id: remotePeripheral.identifier, name: "Unknown2"))
     }
     

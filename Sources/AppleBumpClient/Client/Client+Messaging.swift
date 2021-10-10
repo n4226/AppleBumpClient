@@ -46,21 +46,32 @@ public extension Client {
                 try await connectAndWaitForComplete(to: p)
                 peer = p
             }
+            
+            
+            message.recipient = vid
         }
         //tempid
-        //check for open connection - in either direction
-        else if let p = connectedPeripherals[localId] {
-            peer = p
-        }
-        else if let p = connectedCentrals[localId] {
-            peer = p
-        }
-        // if not open one connect
-        else if let p = nearbyPeripherals[localId] {
-            // connect
-            try await connectAndWaitForComplete(to: p)
-            peer = p
+        else {
+            //check for open connection - in either direction
+            if let p = connectedPeripherals[localId] {
+                peer = p
+            }
+            else if let p = connectedCentrals[localId] {
+                peer = p
+            }
+            // if not open one connect
+            else if let p = nearbyPeripherals[localId] {
+                // connect
+                try await connectAndWaitForComplete(to: p)
+                peer = p
+                
+            }
             
+            if let venderID = userDatabase.reverseLookup(id: localId) {
+                message.recipient = venderID
+            }else {
+                print("failed to find recipent device id")
+            }
         }
         
         
@@ -70,8 +81,7 @@ public extension Client {
         }
         
         //TODO: replace recepient id with vid of device sending to
-        
-        message.recipient = deviceID
+       
         
         let data = try JSONEncoder().encode(message)
         

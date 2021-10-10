@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import UIKit
+import SwiftUI
 
 public enum BUMP {
     
@@ -32,22 +33,44 @@ public enum BUMP {
             lhs.id == rhs.id
         }
         
-        static let defualtName = "unknown"
+        public static let defualtName = "unknown"
         
-        @PersistantStorage(key: "bump.DefaultDevice", defaultValue: Device(name: "", vendorDeviceIdentifier: UIDevice.current.identifierForVendor!, prefs: UserPreferences(preferedAccentColor: Color(r: 0, g: 0, b: 0), appSpacificConfig: Data()), joinDate: Date(), os: UIDevice.current.systemName, osVersion: UIDevice.current.systemVersion, program: UUID(), programVersion: "ERR"))
+        @PersistantStorage(key: "bump.DefaultDevice", defaultValue: Device(name: "No Name", vendorDeviceIdentifier: UIDevice.current.identifierForVendor!, prefs: UserPreferences(preferedAccentColor: Color(SwiftUI.Color.accentColor.cgColor ?? CGColor(red: 0.1, green: 0.5, blue: 0.9, alpha: 1)), appSpacificConfig: Data()), joinDate: Date(), os: UIDevice.current.systemName, osVersion: UIDevice.current.systemVersion, program: UUID(), programVersion: "ERR"))
         public static var this: Device
         
     }
     
     public struct Color: Codable {
-        var r: UInt8
-        var g: UInt8
-        var b: UInt8
+        public init(r: Float, g: Float, b: Float) {
+            self.r = r
+            self.g = g
+            self.b = b
+        }
+        
+        public var r: Float
+        public var g: Float
+        public var b: Float
+        
+        public init(_ cgColor: CGColor) {
+            if cgColor.numberOfComponents < 3 {
+                r = 0
+                g = 0
+                b = 0
+                return
+            }
+            r = Float(cgColor.components![0])
+            g = Float(cgColor.components![1])
+            b = Float(cgColor.components![2])
+        }
+        
+        public var asCG: CGColor {
+            CGColor(red: CGFloat(r), green: CGFloat(g), blue: CGFloat(b), alpha: 1)
+        }
     }
         
     public struct UserPreferences: Codable {
-        var preferedAccentColor: Color
-        var appSpacificConfig: Data
+        public var preferedAccentColor: Color
+        public var appSpacificConfig: Data
     }
     
     

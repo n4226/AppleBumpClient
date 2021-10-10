@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "BLECombineKit",
+        "repositoryURL": "https://github.com/Henryforce/BLECombineKit",
+        "state": {
+          "branch": null,
+          "revision": "c61edbd84c65e28c29337ce794a2c17e248ca3e5",
+          "version": "0.1.6"
+        }
+      }
+    ]
+  },
+  "version": 1
+}

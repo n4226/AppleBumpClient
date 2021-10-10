@@ -15,29 +15,55 @@ public class UserDatabase {
     }
     
     @PersistantStorage(key: "userdatabase.tempStorage", defaultValue: [:])
-    var tempsById: [UUID: DeviceEntry]
+    var tempsByID: [UUID: DeviceEntry]
     
+    @PersistantStorage(key: "userdatabase.detailStorage", defaultValue: [:])
+    var detailsByID: [UUID: BUMP.Device]
     
     public func exists(_ vid: UUID)->Bool {
-        return tempsById[vid] != nil
+        return tempsByID[vid] != nil
     }
     
     public func entry(for vid: UUID)->DeviceEntry? {
-        return tempsById[vid]
+        return tempsByID[vid]
     }
+    
+    public func reverseLookup(id: UUID)->UUID? {
+        return tempsByID.first { item in
+            item.value.centralIDs.contains(id) || item.value.peripheralIDs.contains(id)
+        }?.key
+    }
+    
+    
     
     public func update(vid: UUID,remotePeer: BKRemotePeer) {
         
-        if tempsById[vid] == nil {
-            tempsById[vid] = DeviceEntry()
+        if tempsByID[vid] == nil {
+            tempsByID[vid] = DeviceEntry()
         }
         
         if let central = remotePeer as? BKRemoteCentral {
-            tempsById[vid]?.centralIDs.append(central.identifier)
+            tempsByID[vid]?.centralIDs.append(central.identifier)
         }
         else if let peripheral = remotePeer as? BKRemotePeripheral {
-            tempsById[vid]?.peripheralIDs.append(peripheral.identifier)
+            tempsByID[vid]?.peripheralIDs.append(peripheral.identifier)
         }
+    }
+    
+    public func details(forDevice vid: UUID)->BUMP.Device? {
+        detailsByID[vid]
+    }
+    
+    public func details(forTemp tempID: UUID)->BUMP.Device? {
+        if let vid = reverseLookup(id: tempID) {
+            return detailsByID[vid]
+        }
+        return nil
+    }
+    
+    
+    public func update(details: BUMP.Device) {
+        detailsByID[details.vendorDeviceIdentifier] = details
     }
     
 }

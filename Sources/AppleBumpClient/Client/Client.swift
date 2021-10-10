@@ -18,6 +18,7 @@ public class Client: ObservableObject {
     @Published
     public private(set) var nearbyDevices: [DeviceDiscovery] = []
     
+    public var userDatabase = UserDatabase()
     
     
     // MARK: Private Properties
@@ -34,7 +35,6 @@ public class Client: ObservableObject {
     var scanning = false
     var attemptingToScan = false
     
-    var userDatabase = UserDatabase()
     
     var newDevicesFound = PassthroughSubject<[DeviceDiscovery],Never>()
     

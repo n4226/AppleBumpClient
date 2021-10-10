@@ -36,9 +36,17 @@ extension Client: BKRemotePeerDelegate {
             try await sendMessage(response, to: peer.identifier)
             break
         case .pingResponse:
+            
+            
+            
             break
         case .fistBump:
+            
             // add data received to user database
+            // record information
+            if let deviceDetails = try? JSONDecoder().decode(BUMP.Device.self, from: message.payoload) {
+                userDatabase.update(details: deviceDetails)
+            }
             userDatabase.update(vid: message.sender,remotePeer: peer)
             
             //send back ident message
@@ -47,8 +55,9 @@ extension Client: BKRemotePeerDelegate {
             try await _send(data: binResponse,to: peer)
             
             // if this marks the beginning of a connection mark this device as fully connected
-            if pendingConnections.contains(peer.identifier) {
+            if pendingConnections.contains(peer.identifier), peer is BKRemotePeripheral {
                 pendingConnections.remove(peer.identifier)
+                connectedPeripherals[peer.identifier] = (peer as! BKRemotePeripheral)
                 newDeviceConnection.send(peer)
             }
             
@@ -60,8 +69,23 @@ extension Client: BKRemotePeerDelegate {
         case .ident:
             
             // add data received to user database
-            //TODO: impliment
+            // record information
+            if let deviceDetails = try? JSONDecoder().decode(BUMP.Device.self, from: message.payoload) {
+                userDatabase.update(details: deviceDetails)
+            }
             userDatabase.update(vid: message.sender,remotePeer: peer)
+                
+                
+                
+            
+            // if this marks the beginning of a connection mark this device as fully connected
+            if pendingConnections.contains(peer.identifier), peer is BKRemoteCentral {
+                pendingConnections.remove(peer.identifier)
+                connectedCentrals[peer.identifier] = (peer as! BKRemoteCentral)
+                newDeviceConnection.send(peer)
+            }
+                
+            
             break
         case .deviceStatusRequest:
             break
