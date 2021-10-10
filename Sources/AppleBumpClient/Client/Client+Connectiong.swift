@@ -9,21 +9,59 @@ import Foundation
 
 extension Client {
     
-    func connect(toPeripheral: BKRemotePeripheral) async -> Bool {
-        let result: Bool = await withCheckedContinuation { cont in
+    func connect(toPeripheral: BKRemotePeripheral) async throws {
+        let _:Void = try await withCheckedThrowingContinuation { cont in
             central.connect(remotePeripheral: toPeripheral) { remotePeripheral, error in
                 if error != nil {
                     print("connection error: \(error?.localizedDescription)")
-                    cont.resume(with: .success(false))
+                    cont.resume(with: .failure(Errors.unknown))
                 } else {
                     remotePeripheral.delegate = self
                     self.connectedPeripherals[remotePeripheral.identifier] = remotePeripheral
-                    cont.resume(with: .success(true))
+                    self.pendingConnections.insert(remotePeripheral.identifier)
+                    cont.resume(with: .success(()))
                 }
                 
             }
         }
-        return result
+    }
+    
+    func connectAndWaitForComplete(to peripheral: BKRemotePeripheral)async throws {
+        try await connect(toPeripheral: peripheral)
+        
+        
+        // wait for conneciton response signalling open conneciton
+        let _: Void = try await withCheckedThrowingContinuation({ continuation in
+            actor _Continued {
+                var value = false
+                func fliptoContinued() {
+                    value = true
+                }
+            }
+            let continued = _Continued()
+            
+            let conTask = newDeviceConnection
+                .sink { peer in
+                    Task {
+                        if peer.identifier == peripheral.identifier {
+                            await continued.fliptoContinued()
+                            continuation.resume(with: .success(()))
+                        }
+                    }
+                }
+            
+            //timeout
+            
+            let seconds = 5.0
+            DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+                Task {
+                    if !(await continued.value) {
+                        print("cenneciton timed out: \(conTask.hashValue)")
+                        continuation.resume(with: .failure(Errors.connectionTimedOut))
+                    }
+                }
+            }
+        })
     }
     
 }
@@ -37,13 +75,14 @@ extension Client: BKPeripheralDelegate {
         
         do {
             // send back conneciton ident
-            var msg = try BUMP.BUMPMessage.ident()
+            var msg = try BUMP.BUMPMessage.fistBump()
             msg.recipient = remoteCentral.identifier
             let binMSG = try JSONEncoder().encode(msg)
             
             
             //Never use syncronise version of this func
-            let suc = peripheral.sendData(binMSG, toRemotePeer: remoteCentral) { data, remotePeer, error in
+            peripheral.sendData(binMSG, toRemotePeer: remoteCentral) { data, remotePeer, error in
+                
             }
         } catch {
             print("connection handshake failed")

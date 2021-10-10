@@ -38,6 +38,7 @@ public class Client: ObservableObject {
     
     var newDevicesFound = PassthroughSubject<[DeviceDiscovery],Never>()
     
+    var newDeviceConnection = PassthroughSubject<BKRemotePeer,Never>()
     
     //storage lookup
     var allSeenDevices: [UUID: DeviceDiscovery] = [:]
@@ -46,6 +47,8 @@ public class Client: ObservableObject {
     var connectedPeripherals: [UUID: BKRemotePeripheral] = [:]
     var connectedCentrals: [UUID: BKRemoteCentral] = [:]
     
+    // id can be for peripheral or central
+    var pendingConnections = Set<UUID>()
     
     
     public init () {
@@ -105,6 +108,26 @@ public class Client: ObservableObject {
 //    public func getPublicDeviceId() {
 //        return central.
 //    }
+    
+    enum Errors: LocalizedError {
+        case connectionTimedOut
+        case failedToSend
+        case deviceNotFound
+        case unknown
+        
+        var errorDescription: String? {
+            switch self {
+            case .connectionTimedOut:
+                return "connection timed out"
+            case .failedToSend:
+                return "message failed to send"
+            case .unknown:
+                return "an unkown error occured"
+            case .deviceNotFound:
+                return "the requested device could not be found"
+            }
+        }
+    }
     
 }
 

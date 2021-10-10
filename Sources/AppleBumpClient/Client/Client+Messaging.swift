@@ -9,113 +9,105 @@ import Foundation
 
 public extension Client {
  
-//    func sendToAll(_ message: Message) async {
-//        for p in nearbyDevices {
-//            _ = await sendMessage(message, to: p.id)
-//        }
-//    }
+//
 //
     ///will set the to device field of the message for caller
     ///id can be a known tmeporary id e.g remote peripheral or central id or device vendor id
-    func sendMessage(_ message: BUMP.BUMPMessage,to deviceID: UUID) async -> Bool {
+    func sendMessage(_ message: BUMP.BUMPMessage,to deviceID: UUID) async throws {
+        var message = message
         var peer: BKRemotePeer? = nil
         //determin wether id is temp or perminent -- TODO: right now always assuming temporary
         
+        //TODO: just missing id lookup to either vid, central or peripheral id not just peripheral id
+        //TODO: if deviceid is a nearby peripheral check if presistablished connection exists with its asociated central
+        
+        let vid = deviceID
         let localId = deviceID
         
+        //vid
+        if let entry = userDatabase.entry(for: vid) {
+            //check for peripheral connections
+            if let p = connectedPeripherals.first(where: { v in
+                entry.peripheralIDs.contains(v.key)
+            })?.value {
+                peer = p
+            }
+            //check for central connections
+            else if let p = connectedCentrals.first(where: { v in
+                entry.centralIDs.contains(v.key)
+            })?.value {
+                peer = p
+            }
+            
+            //establish new peer connection
+            else if let p = nearbyPeripherals.first(where: { v in
+                entry.centralIDs.contains(v.key)
+            })?.value {
+                try await connectAndWaitForComplete(to: p)
+                peer = p
+            }
+        }
+        //tempid
         //check for open connection - in either direction
-        if let p = connectedPeripherals[localId] {
+        else if let p = connectedPeripherals[localId] {
             peer = p
         }
-        
+        else if let p = connectedCentrals[localId] {
+            peer = p
+        }
         // if not open one connect
         else if let p = nearbyPeripherals[localId] {
             // connect
-            let suc = await connect(toPeripheral: p)
+            try await connectAndWaitForComplete(to: p)
+            peer = p
             
-            // wait for conneciton response signalling open conneciton
         }
         
         
         //send message
+        guard let peer = peer else {
+            throw Errors.deviceNotFound
+        }
         
+        //TODO: replace recepient id with vid of device sending to
         
-//        var deviceID = deviceID
-//        var message = message
-//
-//        message.receiveDevice = .init(id: deviceID, name: "-")
-//
-//
-//        // check if vendor id in user datavase
-//        if let user = MessageStore.global.userDatabase.lookupUser(vendorID: deviceID),
-//           let localDevice = getFirstPeripheral(of: user) {
-//            deviceID = localDevice
-//            message.receiveDevice = MessageStore.global.userDatabase.lookupDevice(tempID: localDevice)!
-//        }
-//        else if let user = MessageStore.global.userDatabase.lookupUser(tempID: deviceID),
-//                let localDevice = getFirstPeripheral(of: user) {
-////                 deviceID = localDevice
-//                 message.receiveDevice = MessageStore.global.userDatabase.lookupDevice(tempID: localDevice)!
-//             }
-//
-//        var otherDevice = connectedPeripherals[deviceID]
-//
-//
-//        // connect to device
-//        if otherDevice == nil {
-//            otherDevice = nearbyPeripherals[deviceID]
-//            guard let otherDevice = otherDevice else {
-//                print("Tried to talk to a device which could not be found")
-//                return false
-//            }
-//            let connected = await connect(toPeripheral: otherDevice)
-//
-//            await Task.sleep(600_000_000)
-//
-//            if !connected {
-//                print("device connection faild")
-//                return false
-//            }
-//
-//        }
-//
-//        guard let otherDevice = otherDevice else {
-//            print("error of unknown")
-//            return false
-//        }
-//        // send message to device
-//        let  data = try! JSONEncoder().encode(message)
-////        guard let  else {
-////            return false
-////        }
-////
-//        let result: Bool = await withCheckedContinuation { cont in
-//            central.sendData(data, toRemotePeer: otherDevice) { data, remotePeer, error in
-//                if error != nil {
-//                    cont.resume(with: .success(false))
-//                }else {
-//                    cont.resume(with: .success(true))
-//                }
-//            }
-//        }
-//        return result
-        return false
+        message.recipient = deviceID
+        
+        let data = try JSONEncoder().encode(message)
+        
+        try await _send(data: data, to: peer)
+        
+        return
     }
     
-}
-
-extension Client: BKRemotePeerDelegate {
-    public func remotePeer(_ remotePeer: BKRemotePeer, didSendArbitraryData data: Data) {
-        print("data got!")
-//
-        let message = try? JSONDecoder().decode(BUMP.BUMPMessage.self, from: data)
-        if let message = message {
-            print("Got message: \(message)")
-//            Task {
-//                await MessageStore.global.got(message: message)
-//            }
+    ///remoPeer can be a central or peripheral
+    internal func _send(data: Data, to remotePeer: BKRemotePeer) async throws {
+        let _: Void = try await withCheckedThrowingContinuation { cont in
+            if let _ = remotePeer as? BKRemotePeripheral {
+                central.sendData(data, toRemotePeer: remotePeer) { data, remotePeer, error in
+                    if error != nil {
+                        cont.resume(with: .failure(Errors.failedToSend))
+                    }else {
+                        cont.resume(with: .success(()))
+                    }
+                }
+            }else {
+                peripheral.sendData(data, toRemotePeer: remotePeer) { data, remotePeer, error in
+                    if error != nil {
+                        cont.resume(with: .failure(Errors.failedToSend))
+                    }else {
+                        cont.resume(with: .success(()))
+                    }
+                }
+            }
         }
     }
     
+    func breadcastToAllNearby(_ message: BUMP.BUMPMessage) async throws {
+          for p in nearbyDevices {
+              _ = try await sendMessage(message, to: p.id)
+          }
+      }
     
 }
+
